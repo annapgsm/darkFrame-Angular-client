@@ -13,19 +13,20 @@ import { MatButtonModule } from '@angular/material/button';
 import { FetchApiDataService } from '../fetch-api-data';
 
 @Component({
-  selector: 'app-user-registration-form',
-  standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule
-  ],
-  templateUrl: './user-registration-form.html',
-  styleUrl: './user-registration-form.scss'
+    selector: 'app-user-registration-form',
+    standalone: true,
+    imports: [
+        CommonModule,
+        FormsModule,
+        MatCardModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatButtonModule
+    ],
+    templateUrl: './user-registration-form.html',
+    styleUrl: './user-registration-form.scss'
 })
+
 export class UserRegistrationFormComponent {
   @Input() userData = { Username: '', Password: '', Email: '', Birthday: '' };
 

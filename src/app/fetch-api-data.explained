@@ -1,0 +1,264 @@
+// Import Angular core decorator
+// Injectable allows this class to be injected (dependency injection)
+import { Injectable } from '@angular/core';
+
+// Http tools for making API calls
+import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
+
+// RxJS tools (Angular uses Observables instead of Promises)
+import { Observable, throwError } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+
+// Base URL of your backend API
+// All endpoints will be built from this
+const apiUrl = 'https://movie-api-o14j.onrender.com/';
+
+
+// @Injectable tells Angular:
+// "This class can be injected into other classes"
+// providedIn: 'root' means:
+// There will be ONE global instance available everywhere
+@Injectable({
+  providedIn: 'root'
+})
+export class FetchApiDataService {
+
+  // Constructor is called when Angular creates this service.
+  // "private http: HttpClient" does 3 things:
+  // 1. Creates a class property called "http"
+  // 2. Marks it private
+  // 3. Assigns Angular's HttpClient to it automatically
+  constructor(private http: HttpClient) {}
+
+
+
+  // -----------------------------
+  // HELPER METHODS
+  // -----------------------------
+
+  // This method builds the Authorization header.
+  // Used for protected routes (anything requiring a JWT token)
+  private getAuthHeaders(): HttpHeaders {
+
+    // Get token saved after login
+    const token = localStorage.getItem('token');
+
+    // Return new HttpHeaders object
+    return new HttpHeaders({
+      Authorization: 'Bearer ' + token
+    });
+  }
+
+
+  // Extract response body safely
+  // If response is empty, return empty object
+  private extractResponseData(res: any): any {
+    return res || {};
+  }
+
+
+  // Central error handler
+  // If ANY API call fails, this method runs
+  private handleError(error: HttpErrorResponse): any {
+
+    // Client-side error (network issue, etc.)
+    if (error.error instanceof ErrorEvent) {
+      console.error('Client-side error:', error.error.message);
+
+    // Server-side error (400, 401, 500, etc.)
+    } else {
+      console.error(`Server-side error: ${error.status}`, error.error);
+    }
+
+    // Return observable error (RxJS style)
+    return throwError(() => new Error('Something bad happened; try again later.'));
+  }
+
+
+
+  // -----------------------------
+  // AUTH ENDPOINTS
+  // -----------------------------
+
+  // USER REGISTRATION
+  // Takes userDetails object
+  // Returns an Observable
+  public userRegistration(userDetails: any): Observable<any> {
+
+    // http.post(url, body)
+    // .pipe() allows us to chain RxJS operators
+    return this.http.post(apiUrl + 'users', userDetails).pipe(
+
+      // If error occurs, handleError runs
+      catchError(this.handleError)
+    );
+  }
+
+
+  // USER LOGIN
+  public userLogin(userDetails: any): Observable<any> {
+
+    return this.http.post(apiUrl + 'login', userDetails).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+
+
+  // -----------------------------
+  // MOVIES
+  // -----------------------------
+
+  // GET ALL MOVIES (Protected Route)
+  getAllMovies(): Observable<any> {
+
+    return this.http
+      .get(apiUrl + 'movies', {
+
+        // Send Authorization header
+        headers: this.getAuthHeaders()
+
+      })
+      .pipe(
+
+        // map transforms the response
+        // Here we just extract body safely
+        map(this.extractResponseData),
+
+        // Catch errors
+        catchError(this.handleError)
+      );
+  }
+
+
+  // GET ONE MOVIE
+  getOneMovie(movieIdOrTitle: string): Observable<any> {
+
+    return this.http
+      .get(apiUrl + 'movies/' + movieIdOrTitle, {
+        headers: this.getAuthHeaders()
+      })
+      .pipe(
+        map(this.extractResponseData),
+        catchError(this.handleError)
+      );
+  }
+
+
+  // GET DIRECTOR
+  getDirector(name: string): Observable<any> {
+
+    return this.http
+      .get(apiUrl + 'directors/' + name, {
+        headers: this.getAuthHeaders()
+      })
+      .pipe(
+        map(this.extractResponseData),
+        catchError(this.handleError)
+      );
+  }
+
+
+  // GET GENRE
+  getGenre(name: string): Observable<any> {
+
+    return this.http
+      .get(apiUrl + 'genres/' + name, {
+        headers: this.getAuthHeaders()
+      })
+      .pipe(
+        map(this.extractResponseData),
+        catchError(this.handleError)
+      );
+  }
+
+
+
+  // -----------------------------
+  // USER
+  // -----------------------------
+
+  // GET USER DETAILS
+  getUser(username: string): Observable<any> {
+
+    return this.http
+      .get(apiUrl + 'users/' + username, {
+        headers: this.getAuthHeaders()
+      })
+      .pipe(
+        map(this.extractResponseData),
+        catchError(this.handleError)
+      );
+  }
+
+
+  // ADD MOVIE TO FAVORITES
+  addFavouriteMovie(username: string, movieId: string): Observable<any> {
+
+    return this.http
+      .post(
+        apiUrl + 'users/' + username + '/movies/' + movieId,
+
+        // No body needed, but must send empty object
+        {},
+
+        {
+          headers: this.getAuthHeaders()
+        }
+      )
+      .pipe(
+        catchError(this.handleError)
+      );
+  }
+
+
+  // DELETE MOVIE FROM FAVORITES
+  deleteFavouriteMovie(username: string, movieId: string): Observable<any> {
+
+    return this.http
+      .delete(
+        apiUrl + 'users/' + username + '/movies/' + movieId,
+        {
+          headers: this.getAuthHeaders()
+        }
+      )
+      .pipe(
+        catchError(this.handleError)
+      );
+  }
+
+
+  // EDIT USER
+  editUser(username: string, userDetails: any): Observable<any> {
+
+    return this.http
+      .put(
+        apiUrl + 'users/' + username,
+        userDetails,
+        {
+          headers: this.getAuthHeaders()
+        }
+      )
+      .pipe(
+        catchError(this.handleError)
+      );
+  }
+
+
+  // DELETE USER
+  deleteUser(username: string): Observable<any> {
+
+    return this.http
+      .delete(
+        apiUrl + 'users/' + username,
+        {
+          headers: this.getAuthHeaders()
+        }
+      )
+      .pipe(
+        catchError(this.handleError)
+      );
+  }
+
+}
+

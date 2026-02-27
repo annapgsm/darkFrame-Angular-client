@@ -1,0 +1,35 @@
+<h2 mat-dialog-title>{{ movie.Title }}</h2>
+
+<mat-dialog-content>
+  <img
+    [src]="movie.ImagePath"
+    [alt]="movie.Title"
+    style="width: 100%; max-width: 360px; display: block; margin-bottom: 12px;"
+  />
+
+  <p><strong>Description:</strong> {{ movie.Description }}</p>
+
+  <hr />
+
+  <p><strong>Genre:</strong> {{ movie.Genre?.Name }}</p>
+  <p>{{ movie.Genre?.Description }}</p>
+
+  <hr />
+
+  <p><strong>Director:</strong> {{ movie.Director?.Name }}</p>
+  <p>{{ movie.Director?.Bio }}</p>
+  <p>
+    <strong>Born:</strong> {{ movie.Director?.BirthYear }}
+    <span *ngIf="movie.Director?.DeathYear"> · <strong>Died:</strong> {{ movie.Director?.DeathYear }}</span>
+  </p>
+
+  <hr />
+
+  <p><strong>Release Year:</strong> {{ movie.ReleaseYear }}</p>
+  <p><strong>Rating:</strong> {{ movie.Rating }}</p>
+  <p><strong>Featured:</strong> {{ movie.Featured ? 'Yes' : 'No' }}</p>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

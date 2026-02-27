@@ -85,8 +85,12 @@ export class FetchApiDataService {
 
   // 7) Get user
   getUser(username: string): Observable<any> {
-    return this.http.get(apiUrl + 'users/' + username, { headers: this.getAuthHeaders() }).pipe(
-      map(this.extractResponseData),
+    return this.http.get(apiUrl + 'users', { headers: this.getAuthHeaders() }).pipe(
+      map((users: any) => {
+        const user = (users as any[]).find(u => u.Username === username);
+        if (!user) throw new Error('User not found in /users list');
+        return user;
+      }),
       catchError(this.handleError)
     );
   }
@@ -104,7 +108,7 @@ export class FetchApiDataService {
     return this.http.post(
       apiUrl + 'users/' + username + '/movies/' + movieId,
       {},
-      { headers: this.getAuthHeaders() }
+      { headers: this.getAuthHeaders() } // ✅ add this
     ).pipe(catchError(this.handleError));
   }
 
