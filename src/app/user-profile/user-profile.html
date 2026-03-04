@@ -12,58 +12,29 @@
     <form (ngSubmit)="updateProfile()" #profileForm="ngForm" style="display: grid; gap: 12px; margin-top: 12px;">
       <mat-form-field appearance="outline">
         <mat-label>Username</mat-label>
-        <input
-          matInput
-          [(ngModel)]="editData.Username"
-          name="Username"
-          required
-          minlength="5"
-          autocomplete="username"
-        />
+        <input matInput [(ngModel)]="editData.Username" name="Username" required minlength="5"
+          autocomplete="username" />
       </mat-form-field>
 
       <mat-form-field appearance="outline">
         <mat-label>Email</mat-label>
-        <input
-          matInput
-          [(ngModel)]="editData.Email"
-          name="Email"
-          required
-          email
-          autocomplete="email"
-        />
+        <input matInput [(ngModel)]="editData.Email" name="Email" required email autocomplete="email" />
       </mat-form-field>
 
       <mat-form-field appearance="outline">
         <mat-label>Birthday</mat-label>
-        <input
-          matInput
-          type="date"
-          [(ngModel)]="editData.Birthday"
-          name="Birthday"
-          autocomplete="bday"
-        />
+        <input matInput type="date" [(ngModel)]="editData.Birthday" name="Birthday" autocomplete="bday" />
       </mat-form-field>
 
       <mat-form-field appearance="outline">
-        <mat-label>New Password (optional)</mat-label>
-        <input
-          matInput
-          type="password"
-          [(ngModel)]="editData.Password"
-          name="Password"
-          autocomplete="new-password"
-        />
-        <mat-hint>Leave empty to keep your current password.</mat-hint>
+        <mat-label>New Password</mat-label>
+        <input matInput type="password" [(ngModel)]="editData.Password" name="Password" required
+          autocomplete="new-password" />
+        <mat-hint>Write the old password if you don't want it to be changed</mat-hint>
       </mat-form-field>
 
       <div style="display:flex; gap: 10px; justify-content:flex-end; margin-top: 4px;">
-        <button
-          mat-raised-button
-          color="primary"
-          type="submit"
-          [disabled]="profileForm.invalid"
-        >
+        <button mat-raised-button color="primary" type="submit" [disabled]="profileForm.invalid">
           Save changes
         </button>
       </div>
@@ -78,41 +49,34 @@
   </mat-card-header>
 
   <mat-card-content>
-    <p *ngIf="favoriteMovies.length === 0" style="opacity: 0.8; margin: 0;">
+    <p *ngIf="favoriteMovies.length === 0; else elseFavMobiesBlock" style="opacity: 0.8; margin: 0;">
       No favorites yet.
     </p>
 
-    <div
-      *ngFor="let movie of favoriteMovies"
-      style="
-        display:flex;
-        gap: 14px;
-        align-items:center;
-        padding: 10px 0;
-        border-bottom: 1px solid rgba(0,0,0,0.08);
-      "
-    >
-      <img
-        [src]="movie.ImagePath"
-        [alt]="movie.Title"
-        width="60"
-        height="90"
-        loading="lazy"
-        style="object-fit: cover; border-radius: 6px;"
-      />
+    <ng-template #elseFavMobiesBlock>
+      <div *ngFor="let movie of favoriteMovies" style="
+            display:flex;
+            gap: 14px;
+            align-items:center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
+          ">
+        <img [src]="movie.ImagePath" [alt]="movie.Title" width="60" height="90" loading="lazy"
+          style="object-fit: cover; border-radius: 6px;" />
 
-      <div style="flex: 1; min-width: 0;">
-        <div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-          {{ movie.Title }}
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            {{ movie.Title }}
+          </div>
+          <div style="opacity: 0.8;">
+            {{ movie.Genre?.Name }}
+          </div>
         </div>
-        <div style="opacity: 0.8;">
-          {{ movie.Genre?.Name }}
-        </div>
+
+        <button mat-stroked-button color="warn" (click)="removeFromFavorites(movie)">
+          Remove
+        </button>
       </div>
-
-      <button mat-stroked-button color="warn" (click)="removeFromFavorites(movie)">
-        Remove
-      </button>
-    </div>
+    </ng-template>
   </mat-card-content>
 </mat-card>

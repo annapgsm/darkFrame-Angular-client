@@ -1,23 +1,25 @@
-<div *ngFor="let movie of (movies$ | async) ?? []">
-  <mat-card style="margin: 10px; max-width: 320px;">
-    <mat-card-title>{{ movie.Title }}</mat-card-title>
+<div class="movies-grid">
+  <div *ngFor="let movie of (movies$ | async) ?? []" class="movie-card-wrapper">
+    <mat-card>
+      <mat-card-title>{{ movie.Title }}</mat-card-title>
 
-    <img mat-card-image [src]="movie.ImagePath" [alt]="movie.Title" />
+      <img mat-card-image [src]="movie.ImagePath" [alt]="movie.Title" />
 
-    <mat-card-content>
-      <p><strong>Genre:</strong> {{ movie.Genre?.Name }}</p>
-    </mat-card-content>
+      <mat-card-content>
+        <p><strong>Genre:</strong> {{ movie.Genre?.Name }}</p>
+      </mat-card-content>
 
-    <mat-card-actions>
-      <button mat-button color="primary" (click)="openMovieDetailsDialog(movie)">
-        More info
-      </button>
+      <mat-card-actions>
+        <button mat-button color="primary" (click)="openMovieDetailsDialog(movie)">
+          More info
+        </button>
 
-       <button mat-icon-button (click)="toggleFavorite(movie)">
-        <mat-icon color="warn">
-          {{ isFavorite(movie) ? 'favorite' : 'favorite_border' }}
-        </mat-icon>
-      </button>
-    </mat-card-actions>
-  </mat-card>
+        <button mat-icon-button (click)="toggleFavorite(movie)">
+          <mat-icon color="warn">
+            {{ isFavorite(movie) ? 'favorite' : 'favorite_border' }}
+          </mat-icon>
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
 </div>

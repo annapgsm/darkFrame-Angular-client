@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -25,7 +25,10 @@ export class UserProfileComponent implements OnInit {
   favoriteMovies: any[] = [];
   allMovies: any[] = [];
 
-  constructor(public fetchApiData: FetchApiDataService) {}
+  constructor(
+    public fetchApiData: FetchApiDataService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     this.loadUserAndFavorites();
@@ -36,39 +39,54 @@ export class UserProfileComponent implements OnInit {
     return storedUser?.Username ?? null;
   }
 
-  private getMovieId(movie: any): string {
-    return movie?._id?.$oid ?? movie?._id;
+  private normalizeId(id: any): string {
+    if (!id) return '';
+    if (typeof id === 'string') return id.trim();
+    if (id?.$oid) return id.$oid;
+    if (id?._id) return this.normalizeId(id._id);
+    if (id?.id) return this.normalizeId(id.id);
+    return String(id).trim();
   }
 
-  private loadUserAndFavorites(): void {
+  private getMovieId(movie: any): string {
+    if (!movie) return '';
+    return this.normalizeId(movie._id || movie);
+  }
+
+  private loadUserAndFavorites(retryCount = 0): void {
     const username = this.getStoredUsername();
-    console.log('[Profile] stored username:', username);
+    console.log(`[Profile] === LOAD STARTED (retry ${retryCount}) === Username:`, username);
 
     if (!username) return;
 
     forkJoin({
       user: this.fetchApiData.getUser(username).pipe(
-        catchError((err) => {
-          console.log('[Profile] getUser failed:', err);
-          return of(null);
-        })
+        catchError((err) => { console.error('[Profile] getUser failed:', err); return of(null); })
       ),
       movies: this.fetchApiData.getAllMovies().pipe(
-        catchError((err) => {
-          console.log('[Profile] getAllMovies failed:', err);
-          return of([]);
-        })
+        catchError((err) => { console.error('[Profile] getAllMovies failed:', err); return of([]); })
       )
     }).subscribe({
       next: ({ user, movies }) => {
-        if (!user) return;
+        console.log('[Profile] === API DATA RECEIVED ===');
+
+        if (!user) {
+          console.log('[Profile] No user returned from API');
+          return;
+        }
 
         this.user = user;
         localStorage.setItem('user', JSON.stringify(user));
         this.allMovies = movies as any[];
 
-        console.log('[Profile] USER FROM API:', user);
-        console.log('[Profile] USER.FavoriteMovies:', user?.FavoriteMovies);
+        console.log('[Profile] allMovies count:', this.allMovies.length);
+        if (this.allMovies.length > 0) {
+          console.log('[Profile] Sample movie _id raw:', JSON.stringify(this.allMovies[0]._id));
+        }
+
+        console.log('[Profile] Raw FavoriteMovies:', JSON.stringify(user.FavoriteMovies));
+        console.log('[Profile] FavoriteMovies is array?', Array.isArray(user.FavoriteMovies));
+        console.log('[Profile] Number of favorites in API:', user.FavoriteMovies?.length ?? 0);
 
         this.editData = {
           Username: user.Username || '',
@@ -77,17 +95,28 @@ export class UserProfileComponent implements OnInit {
           Birthday: (user.Birthday || '').slice(0, 10)
         };
 
-        const favIds: string[] = (user.FavoriteMovies || []).map((x: any) => String(x));
+        const favIds: string[] = (user.FavoriteMovies || [])
+          .map((x: any) => this.normalizeId(x))
+          .filter((id: string) => id.length > 0);
+
+        console.log('[Profile] Normalized favIds:', favIds);
 
         this.favoriteMovies = (this.allMovies || []).filter((m: any) => {
-          const id = String(this.getMovieId(m));
-          return favIds.includes(id);
+          return favIds.includes(this.getMovieId(m));
         });
 
-        console.log('[Profile] favIds:', favIds);
-        console.log('[Profile] matched favorites:', this.favoriteMovies.map(m => this.getMovieId(m)));
+        console.log('[Profile] FINAL matched favorites count:', this.favoriteMovies.length);
+
+        // Force Angular to update the view
+        this.cdr.detectChanges();
+
+        // Auto-retry once if nothing matched (common race condition)
+        if (this.favoriteMovies.length === 0 && retryCount < 1) {
+          console.log('[Profile] No matches → retrying in 600ms...');
+          setTimeout(() => this.loadUserAndFavorites(retryCount + 1), 600);
+        }
       },
-      error: (err) => console.log('[Profile] forkJoin failed:', err)
+      error: (err) => console.error('[Profile] forkJoin error:', err)
     });
   }
 
@@ -100,19 +129,17 @@ export class UserProfileComponent implements OnInit {
       Email: this.editData.Email,
       Birthday: this.editData.Birthday
     };
-
     if (this.editData.Password?.trim()) payload.Password = this.editData.Password;
 
     this.fetchApiData.editUser(username, payload).subscribe({
       next: (updatedUser: any) => {
-        console.log('[Profile] updated user:', updatedUser);
         this.user = updatedUser;
         localStorage.setItem('user', JSON.stringify(updatedUser));
         alert('Profile updated!');
         this.loadUserAndFavorites();
       },
       error: (err) => {
-        console.log(err);
+        console.error(err);
         alert('Update failed.');
       }
     });
@@ -122,20 +149,22 @@ export class UserProfileComponent implements OnInit {
     const username = this.user?.Username;
     const movieId = this.getMovieId(movie);
 
-    console.log('[Profile] removing favorite', { username, movieId });
-
     if (!username || !movieId) return;
+
+    // Optimistic UI update
+    this.favoriteMovies = this.favoriteMovies.filter(m => this.getMovieId(m) !== movieId);
+    this.cdr.detectChanges();
 
     this.fetchApiData.deleteFavouriteMovie(username, movieId).subscribe({
       next: (updatedUser: any) => {
-        console.log('[Profile] UPDATED USER AFTER REMOVE:', updatedUser);
-        console.log('[Profile] UPDATED FAVORITES AFTER REMOVE:', updatedUser?.FavoriteMovies);
-
         this.user = updatedUser;
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        this.loadUserAndFavorites();
       },
-      error: (err) => console.log(err)
+      error: (err) => {
+        console.error(err);
+        this.loadUserAndFavorites(); // revert
+        alert('Failed to remove from favorites.');
+      }
     });
   }
 }

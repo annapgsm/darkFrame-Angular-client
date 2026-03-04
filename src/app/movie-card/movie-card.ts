@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Observable } from 'rxjs';
 
@@ -29,9 +29,9 @@ export class MovieCardComponent implements OnInit {
 
   constructor(
     public fetchApiData: FetchApiDataService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private cdr: ChangeDetectorRef   // ← added for instant UI updates
   ) {
-    // Keep your Observable approach
     this.movies$ = this.fetchApiData.getAllMovies();
   }
 
@@ -44,32 +44,43 @@ export class MovieCardComponent implements OnInit {
     return storedUser?.Username ?? null;
   }
 
+  // === SAME ROBUST NORMALIZER AS IN PROFILE (this fixes the ID mismatch) ===
+  private normalizeId(id: any): string {
+    if (!id) return '';
+    if (typeof id === 'string') return id.trim();
+    if (id?.$oid) return id.$oid;
+    if (id?._id) return this.normalizeId(id._id);
+    if (id?.id) return this.normalizeId(id.id);
+    return String(id).trim();
+  }
+
   private getMovieId(movie: any): string {
-    // supports both shapes
-    return String(movie?._id?.$oid ?? movie?._id ?? '');
+    if (!movie) return '';
+    return this.normalizeId(movie._id || movie);
   }
 
   getMovies(): void {
     const username = this.getStoredUsername();
+    console.log('[MovieCard] getMovies() called - username:', username);
 
-    console.log('[MovieCard] getMovies() called');
-    console.log('[MovieCard] stored username:', username);
-
-    // 1) load favorites first (so hearts render right)
     if (username) {
       this.fetchApiData.getUser(username).subscribe({
         next: (user: any) => {
           console.log('[MovieCard] USER FROM API:', user);
-          console.log('[MovieCard] USER.FavoriteMovies:', user?.FavoriteMovies);
+          console.log('[MovieCard] Raw FavoriteMovies:', JSON.stringify(user?.FavoriteMovies));
 
-          this.favoriteMovieIds = (user?.FavoriteMovies || []).map((x: any) => String(x));
-          console.log('[MovieCard] favoriteMovieIds now:', this.favoriteMovieIds);
+          // Use the robust normalizer
+          this.favoriteMovieIds = (user?.FavoriteMovies || [])
+            .map((x: any) => this.normalizeId(x))
+            .filter((id: string) => id.length > 0);
+
+          console.log('[MovieCard] Normalized favoriteMovieIds:', this.favoriteMovieIds);
+          this.cdr.detectChanges();   // force heart icons to update
         },
-        error: (err) => console.log('[MovieCard] getUser failed:', err)
+        error: (err) => console.error('[MovieCard] getUser failed:', err)
       });
     }
 
-    // 2) movies observable
     this.movies$ = this.fetchApiData.getAllMovies();
   }
 
@@ -77,26 +88,6 @@ export class MovieCardComponent implements OnInit {
     this.dialog.open(MovieDetailsDialogComponent, {
       data: movie,
       width: '420px'
-    });
-  }
-
-  // Optional: keep if you use it somewhere else
-  addToFavorites(movieId: string): void {
-    const username = this.getStoredUsername();
-    if (!username) return;
-
-    console.log('[MovieCard] addToFavorites()', { username, movieId });
-
-    this.fetchApiData.addFavouriteMovie(username, String(movieId)).subscribe({
-      next: (updatedUser: any) => {
-        console.log('[MovieCard] UPDATED USER AFTER ADD (addToFavorites):', updatedUser);
-        console.log('[MovieCard] UPDATED FAVORITES AFTER ADD:', updatedUser?.FavoriteMovies);
-
-        this.favoriteMovieIds = (updatedUser?.FavoriteMovies || []).map((x: any) => String(x));
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        alert('Added to favorites!');
-      },
-      error: (err) => console.log('[MovieCard] addToFavorites failed:', err)
     });
   }
 
@@ -109,37 +100,52 @@ export class MovieCardComponent implements OnInit {
     const username = this.getStoredUsername();
     const movieId = this.getMovieId(movie);
 
-    console.log('[MovieCard] toggleFavorite clicked');
-    console.log('[MovieCard] username:', username);
-    console.log('[MovieCard] raw movie._id:', movie?._id);
-    console.log('[MovieCard] movieId computed:', movieId);
-    console.log('[MovieCard] currently favorite?', this.favoriteMovieIds.includes(movieId));
+    console.log('[MovieCard] toggle clicked for', movie?.Title, '- ID:', movieId);
 
     if (!username || !movieId) return;
 
-    if (this.isFavorite(movie)) {
-      console.log('[MovieCard] removing favorite...');
+    const currentlyFavorite = this.isFavorite(movie);
+
+    // === OPTIMISTIC UPDATE (heart changes instantly) ===
+    if (currentlyFavorite) {
+      this.favoriteMovieIds = this.favoriteMovieIds.filter(id => id !== movieId);
+      console.log('[MovieCard] optimistic REMOVE - new list:', this.favoriteMovieIds);
+    } else {
+      this.favoriteMovieIds.push(movieId);
+      console.log('[MovieCard] optimistic ADD - new list:', this.favoriteMovieIds);
+    }
+    this.cdr.detectChanges();   // ← this makes the heart update on FIRST click
+
+    // === ACTUAL API CALL ===
+    if (currentlyFavorite) {
       this.fetchApiData.deleteFavouriteMovie(username, movieId).subscribe({
         next: (updatedUser: any) => {
-          console.log('[MovieCard] UPDATED USER AFTER REMOVE:', updatedUser);
-          console.log('[MovieCard] UPDATED FAVORITES AFTER REMOVE:', updatedUser?.FavoriteMovies);
-
-          this.favoriteMovieIds = (updatedUser?.FavoriteMovies || []).map((x: any) => String(x));
+          console.log('[MovieCard] REMOVE success - server list:', updatedUser?.FavoriteMovies);
+          this.favoriteMovieIds = (updatedUser?.FavoriteMovies || [])
+            .map((x: any) => this.normalizeId(x))
+            .filter((id: string) => id.length > 0);
           localStorage.setItem('user', JSON.stringify(updatedUser));
         },
-        error: (err) => console.log('[MovieCard] remove favorite failed:', err)
+        error: (err) => {
+          console.error(err);
+          this.getMovies(); // revert on error
+          alert('Failed to remove from favorites.');
+        }
       });
     } else {
-      console.log('[MovieCard] adding favorite...');
       this.fetchApiData.addFavouriteMovie(username, movieId).subscribe({
         next: (updatedUser: any) => {
-          console.log('[MovieCard] UPDATED USER AFTER ADD:', updatedUser);
-          console.log('[MovieCard] UPDATED FAVORITES AFTER ADD:', updatedUser?.FavoriteMovies);
-
-          this.favoriteMovieIds = (updatedUser?.FavoriteMovies || []).map((x: any) => String(x));
+          console.log('[MovieCard] ADD success - server list:', updatedUser?.FavoriteMovies);
+          this.favoriteMovieIds = (updatedUser?.FavoriteMovies || [])
+            .map((x: any) => this.normalizeId(x))
+            .filter((id: string) => id.length > 0);
           localStorage.setItem('user', JSON.stringify(updatedUser));
         },
-        error: (err) => console.log('[MovieCard] add favorite failed:', err)
+        error: (err) => {
+          console.error(err);
+          this.getMovies(); // revert on error
+          alert('Failed to add to favorites.');
+        }
       });
     }
   }

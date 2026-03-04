@@ -1,0 +1,22 @@
+.movies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  padding: 20px;
+  justify-content: center;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Optional nice touch */
+.movie-card-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+mat-card {
+  width: 100%;
+  max-width: 320px;
+  margin: 0;               /* we control spacing with gap now */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
